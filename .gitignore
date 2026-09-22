@@ -1,0 +1,16 @@
+# build artifacts
+whisper.cpp/build/
+
+# model files (large; download separately)
+models/
+*.bin
+
+# audio scratch files
+*.wav
+*.mp3
+
+# temporary notes file written by the app
+.whisper-notes.tmp
+
+# the linked binary
+whisperpipe
