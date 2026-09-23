@@ -1,7 +1,6 @@
 # linuxwhisperpipe
 
-Real-time local speech-to-text for Linux. Captures your system audio (the
-monitor source of an output device) through the PipeWire/PulseAudio API,
+Real-time local speech-to-text for Linux. Captures your system audio through the PipeWire/PulseAudio API,
 gates out silence, and transcribes it with
 [whisper.cpp](https://github.com/ggml-org/whisper.cpp) — fully local,
 automatic language detection, timestamped output.
@@ -41,15 +40,12 @@ make            # CPU backend — works out of the box
 looks by default, so no flag is needed afterwards:
 
 ```sh
-./download-model.sh           # ggml-small (the app's built-in default)
+./download-model.sh           # ggml-small (the app's built-in default recommended for CPU use)
 # ./download-model.sh base    # fastest, lower quality
-# ./download-model.sh large-v3-turbo   # best quality/speed tradeoff, larger
+# ./download-model.sh large-v3  # best (quality/speed recommended for GPU use)
 ```
 
-**4. Find your monitor source** — the one thing that differs per machine.
-Every output device has a `...monitor` source that receives everything
-played through it; you want the monitor of the device your audio actually
-goes through (speakers/headphones, not the HDMI of an unused TV):
+**4. Find your monitor source** — 
 
 ```sh
 pactl list sources short | grep monitor
@@ -86,7 +82,7 @@ Tuning:
 
 ### GPU (optional)
 
-CPU works out of the box. For faster inference rebuild with a GPU backend
+CPU works out of the box but quality is not the best, for best quality/speed rebuild with a GPU backend
 (driver packages for your card required):
 
 ```sh
@@ -105,7 +101,7 @@ make GPU=HIP      # AMD (ROCm)
 - **No text although audio plays** — you're monitoring a source that
   receives no audio. Pick the monitor of the *output device* you actually
   use (step 4).
-- **Slow on CPU** — use a smaller model or build with `make GPU=Vulkan`.
+- **Slow on CPU** — use a smaller model or build with GPU for instance `make GPU=Vulkan`.
 
 ## How it works
 
@@ -117,4 +113,4 @@ stdout.
 
 ## License
 
-MIT (see [LICENSE](LICENSE); whisper.cpp is MIT too).
+MIT (see [LICENSE](LICENSE); whisper.cpp is MIT too). YOU CAN COPY DISTRIBUTE AND DO WHATEVER YOU WANT WITH THIS CODE BUT MONETIZING IT
