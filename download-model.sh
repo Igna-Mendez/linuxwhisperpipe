@@ -23,7 +23,7 @@ declare -A NAMES=(
   [large-v3-turbo]="ggml-large-v3-turbo.bin"
 )
 
-NAME="${1:-large-v3-turbo}"
+NAME="${1:-small}"
 FILE="${NAMES[$NAME]:-}"
 if [ -z "$FILE" ]; then
   echo "Unknown model: '$NAME'" >&2
@@ -32,7 +32,7 @@ if [ -z "$FILE" ]; then
 fi
 
 mkdir -p models
-DEST="models/$FILE"
+DEST="whisper.cpp/models/$FILE"
 URL="https://huggingface.co/ggerganov/whisper.cpp/resolve/main/$FILE"
 
 if [ -f "$DEST" ]; then

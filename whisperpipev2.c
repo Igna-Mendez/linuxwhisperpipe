@@ -14,7 +14,6 @@
 #include <pulse/simple.h>
 #include <pulse/error.h>
 
-#include "ggml-backend.h"
 #include "whisper.h"
 
 /* compile-time upper bound for buffer allocation */
@@ -22,9 +21,8 @@
 #define MAX_CHUNK_SEC 10
 
 /* defaults (overridable via CLI flags) */
-#define DEF_MODEL_PATH    "models/ggml-large-v3-turbo.bin"
+#define DEF_MODEL_PATH    "whisper.cpp/models/ggml-small.bin"
 #define DEF_MONITOR_SRC   "alsa_output.pci-0000_09_00.4.analog-stereo.monitor"
-#define DEF_BACKEND_DIR   "whisper.cpp/build/bin"
 #define DEF_N_THREADS     6
 #define DEF_SILENCE_RMS   100.0
 #define DEF_CHUNK_SEC     3
@@ -33,13 +31,11 @@
 /* runtime config (set in main) */
 static const char *g_model_path  = DEF_MODEL_PATH;
 static const char *g_monitor_src = DEF_MONITOR_SRC;
-static const char *g_backend_dir = DEF_BACKEND_DIR;
 static int         g_n_threads   = DEF_N_THREADS;
 static double      g_silence_rms = DEF_SILENCE_RMS;
 static int         g_chunk_sec   = DEF_CHUNK_SEC;
 static int         g_chunk_samples = 0;  /* set in main */
 static int         g_model_given   = 0;   /* set if -m/--model passed */
-static int         g_backend_given = 0;   /* set if -b/--backend passed */
 
 /* buffers sized for max chunk */
 static int16_t g_pcm[SAMPLE_RATE * MAX_CHUNK_SEC];
@@ -108,7 +104,10 @@ static void print_segment(int i, const char *lang) {
     strftime(wall, sizeof wall, "%H:%M:%S", &tmv);
     int n = snprintf(line, sizeof line, "[%s.%03d] [%s] %.*s\n",
                      wall, ms, lang, (int)len, text);
-    fwrite(line, 1, n, stdout);
+    if (n < 0) return;
+    if ((size_t)n >= sizeof line) n = (int)sizeof(line) - 1; /* clamp: snprintf's
+        return value is what *would* have been written, not what fit in `line` */
+        fwrite(line, 1, n, stdout);
     fflush(stdout);
     if (g_notes) { fwrite(line, 1, n, g_notes); fflush(g_notes); }
 }
@@ -124,7 +123,13 @@ static void *worker(void *arg) {
         pthread_mutex_unlock(&g_lock);
 
         /* silence gate */
-        if (chunk_rms(g_pcm, g_chunk_samples) < g_silence_rms) continue;
+        if (chunk_rms(g_pcm, g_chunk_samples) < g_silence_rms) {
+            pthread_mutex_lock(&g_lock);
+            g_worker_done = 1;
+            pthread_cond_signal(&g_cond);
+            pthread_mutex_unlock(&g_lock);
+            continue;
+        }
 
         for (int i = 0; i < g_chunk_samples; i++)
             g_flt[i] = (float)g_pcm[i] / 32768.0f;
@@ -159,12 +164,11 @@ static void usage(const char *prog) {
             "Usage: %s [options]\n\n"
             "  -m, --model PATH     GGML model file       [%s]\n"
             "  -s, --source NAME    PipeWire monitor source [%s]\n"
-            "  -b, --backend DIR    Backend .so directory [%s]\n"
             "  -t, --threads N      Inference threads     [%d]\n"
             "  -r, --rms THRESHOLD  Silence RMS gate      [%.0f]\n"
             "  -c, --chunk SECS     Chunk duration (1-%d) [%d]\n"
             "  -h, --help           Show this help\n",
-            prog, DEF_MODEL_PATH, DEF_MONITOR_SRC, DEF_BACKEND_DIR,
+            prog, DEF_MODEL_PATH, DEF_MONITOR_SRC,
             DEF_N_THREADS, DEF_SILENCE_RMS, MAX_CHUNK_SEC, DEF_CHUNK_SEC);
 }
 
@@ -174,7 +178,6 @@ int main(int argc, char *argv[]) {
     static struct option long_opts[] = {
         {"model",   required_argument, 0, 'm'},
         {"source",  required_argument, 0, 's'},
-        {"backend", required_argument, 0, 'b'},
         {"threads", required_argument, 0, 't'},
         {"rms",     required_argument, 0, 'r'},
         {"chunk",   required_argument, 0, 'c'},
@@ -183,11 +186,10 @@ int main(int argc, char *argv[]) {
     };
 
     int opt;
-    while ((opt = getopt_long(argc, argv, "m:s:b:t:r:c:h", long_opts, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "m:s:t:r:c:h", long_opts, NULL)) != -1) {
         switch (opt) {
             case 'm': g_model_path  = optarg; g_model_given = 1; break;
             case 's': g_monitor_src = optarg; break;
-            case 'b': g_backend_dir = optarg; g_backend_given = 1; break;
             case 't': g_n_threads   = atoi(optarg); break;
             case 'r': g_silence_rms = atof(optarg); break;
             case 'c': g_chunk_sec   = atoi(optarg); break;
@@ -203,19 +205,18 @@ int main(int argc, char *argv[]) {
     }
     g_chunk_samples = SAMPLE_RATE * g_chunk_sec;
 
-    /* resolve default paths relative to the binary's own directory */
-    static char resolved_model[4096 + 64], resolved_backend[4096 + 64];
-    if (!g_model_given   && bin_dir_join(resolved_model,   sizeof resolved_model,   DEF_MODEL_PATH))
+    /* resolve the default model path relative to the binary's own directory */
+    static char resolved_model[4096 + 64];
+    if (!g_model_given && bin_dir_join(resolved_model, sizeof resolved_model, DEF_MODEL_PATH))
         g_model_path = resolved_model;
-    if (!g_backend_given && bin_dir_join(resolved_backend, sizeof resolved_backend, DEF_BACKEND_DIR))
-        g_backend_dir = resolved_backend;
 
     signal(SIGINT, on_signal);
     signal(SIGTERM, on_signal);
 
     whisper_log_set(cb_log_disable, NULL);
 
-    ggml_backend_load_all_from_path(g_backend_dir);
+    /* backends (CPU/Vulkan/CUDA/HIP) are linked in statically now, so they
+     *      self-register at startup — no ggml_backend_load_all_from_path() needed */
 
     struct whisper_context_params cparams = whisper_context_default_params();
     g_ctx = whisper_init_from_file_with_params(g_model_path, cparams);
@@ -261,7 +262,6 @@ int main(int argc, char *argv[]) {
     printf("whisperpipe\n");
     printf("  model:   %s\n", g_model_path);
     printf("  source:  %s\n", g_monitor_src);
-    printf("  backend: %s\n", g_backend_dir);
     printf("  threads: %d | chunk: %ds | rms gate: %.0f\n",
            g_n_threads, g_chunk_sec, g_silence_rms);
     printf("\nCtrl+C to stop\n\n");
