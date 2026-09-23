@@ -90,14 +90,13 @@ static void print_segment(int i, const char *lang) {
 
     int64_t t0_ms = whisper_full_get_segment_t0(g_ctx, i) / 10;
     time_t sec = g_chunk_start.tv_sec + (time_t)(t0_ms / 1000);
-    int ms = (int)(t0_ms % 1000);
     struct tm tmv;
     localtime_r(&sec, &tmv);
 
     char wall[16], line[2048];
     strftime(wall, sizeof wall, "%H:%M:%S", &tmv);
-    int n = snprintf(line, sizeof line, "[%s.%03d] [%s] %.*s\n",
-                     wall, ms, lang, (int)len, text);
+    int n = snprintf(line, sizeof line, "[%s] [%s] %.*s\n",
+                     wall, lang, (int)len, text);
     if (n < 0) return;
     if ((size_t)n >= sizeof line) n = (int)sizeof(line) - 1; /* snprintf returns the
         *would-be* length, not what fit — clamp before writing */

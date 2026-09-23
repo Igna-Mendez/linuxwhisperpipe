@@ -30,10 +30,17 @@ GGML_LIB         := $(BUILD_DIR)/ggml/src/libggml.a
 GGML_CPU_LIB     := $(BUILD_DIR)/ggml/src/libggml-cpu.a
 GGML_BASE_LIB    := $(BUILD_DIR)/ggml/src/libggml-base.a
 LDFLAGS =
+# Extra system libs each accelerated backend needs at link time (the static
+# ggml-<backend>.a only contains the backend glue, not the vendor runtime).
+GPU_LIBS =
+ifeq ($(GPU),Vulkan)
+  GPU_LIBS += -lvulkan
+endif
+
 ifneq ($(GPU),CPU)
-  GGML_GPU_LIB := $(BUILD_DIR)/ggml/src/libggml-$(shell echo $(GPU) | tr 'A-Z' 'a-z').a
+  GGML_GPU_LIB := $(BUILD_DIR)/ggml/src/ggml-$(shell echo $(GPU) | tr 'A-Z' 'a-z')/libggml-$(shell echo $(GPU) | tr 'A-Z' 'a-z').a
   LDLIBS  = $(WHISPER_LIB) $(GGML_LIB) $(GGML_GPU_LIB) $(GGML_CPU_LIB) $(GGML_BASE_LIB) \
-            -lpulse-simple -lpulse -ldl -lm -lpthread -lstdc++
+            $(GPU_LIBS) -lpulse-simple -lpulse -ldl -lm -lpthread -lstdc++
 else
   LDLIBS  = $(WHISPER_LIB) $(GGML_LIB) $(GGML_CPU_LIB) $(GGML_BASE_LIB) \
             -lpulse-simple -lpulse -ldl -lm -lpthread -lstdc++
