@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # ----------------------------------------------------------------------------
-# download-model.sh — fetch a whisper.cpp GGML model into ./models/
+# download-model.sh — fetch a whisper.cpp GGML model into whisper.cpp/models/
 #
-#   ./download-model.sh            # default: ggml-large-v3-turbo.bin
+#   ./download-model.sh            # default: ggml-small.bin
 #   ./download-model.sh small      # ggml-small.bin
 #   ./download-model.sh base       # ggml-base.bin
 #   ./download-model.sh tiny       # ggml-tiny.bin
 #   ./download-model.sh medium     # ggml-medium.bin
 #   ./download-model.sh large-v3   # ggml-large-v3.bin
-#   ./download-model.sh large-v3-turbo   # (default)
+#   ./download-model.sh large-v3-turbo   # ggml-large-v3-turbo.bin
 # ----------------------------------------------------------------------------
 set -euo pipefail
 
@@ -23,6 +23,9 @@ declare -A NAMES=(
   [large-v3-turbo]="ggml-large-v3-turbo.bin"
 )
 
+# NOTE: the app's built-in default is ggml-small.bin — download that unless
+# you pass -m explicitly.
+
 NAME="${1:-small}"
 FILE="${NAMES[$NAME]:-}"
 if [ -z "$FILE" ]; then
@@ -31,8 +34,8 @@ if [ -z "$FILE" ]; then
   exit 1
 fi
 
-mkdir -p models
 DEST="whisper.cpp/models/$FILE"
+mkdir -p "$(dirname "$DEST")"
 URL="https://huggingface.co/ggerganov/whisper.cpp/resolve/main/$FILE"
 
 if [ -f "$DEST" ]; then
