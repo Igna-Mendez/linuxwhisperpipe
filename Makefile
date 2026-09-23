@@ -40,7 +40,7 @@ else
 endif
 
 TARGET  := whisperpipe
-SRC     := whisperpipev2.c
+SRC     := whisperpipe.c
 ALL_LIBS = $(WHISPER_LIB) $(GGML_LIB) $(GGML_CPU_LIB) $(GGML_BASE_LIB)
 ifneq ($(GPU),CPU)
 ALL_LIBS += $(GGML_GPU_LIB)
