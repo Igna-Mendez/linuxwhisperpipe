@@ -16,11 +16,9 @@
 
 #include "whisper.h"
 
-/* compile-time upper bound for buffer allocation */
 #define SAMPLE_RATE   16000
 #define MAX_CHUNK_SEC 10
 
-/* defaults (overridable via CLI flags) */
 #define DEF_MODEL_PATH    "whisper.cpp/models/ggml-small.bin"
 #define DEF_MONITOR_SRC   "alsa_output.pci-0000_09_00.4.analog-stereo.monitor"
 #define DEF_N_THREADS     6
@@ -28,7 +26,6 @@
 #define DEF_CHUNK_SEC     3
 #define NOTES_FILE        ".whisper-notes.tmp"
 
-/* runtime config (set in main) */
 static const char *g_model_path  = DEF_MODEL_PATH;
 static const char *g_monitor_src = DEF_MONITOR_SRC;
 static int         g_n_threads   = DEF_N_THREADS;
@@ -37,7 +34,7 @@ static int         g_chunk_sec   = DEF_CHUNK_SEC;
 static int         g_chunk_samples = 0;  /* set in main */
 static int         g_model_given   = 0;   /* set if -m/--model passed */
 
-/* buffers sized for max chunk */
+/* buffers sized for the max chunk */
 static int16_t g_pcm[SAMPLE_RATE * MAX_CHUNK_SEC];
 static float   g_flt[SAMPLE_RATE * MAX_CHUNK_SEC];
 
@@ -55,11 +52,8 @@ static struct timespec g_chunk_start;
 
 static void on_signal(int sig) { (void)sig; g_running = 0; }
 
-/*
- * Append a relative path to the executable's own directory (via
- * /proc/self/exe on Linux) so the app works regardless of the current working
- * directory. Returns 1 on success. `out` must be at least 4096+64 bytes.
- */
+/* join `rel` onto the executable's own directory (/proc/self/exe), so paths
+ * work regardless of the cwd. Returns 1 on success. */
 static int bin_dir_join(char *out, size_t out_sz, const char *rel) {
     char exe[4096];
     ssize_t n = readlink("/proc/self/exe", exe, sizeof exe - 1);
@@ -72,7 +66,7 @@ static int bin_dir_join(char *out, size_t out_sz, const char *rel) {
     return (len > 0 && (size_t)len < out_sz) ? 1 : 0;
 }
 
-/* silence whisper/ggml log chatter (same idiom as whisper.cpp's own examples) */
+/* silence whisper/ggml log chatter */
 static void cb_log_disable(enum ggml_log_level, const char *, void *) { }
 
 static double chunk_rms(const int16_t *p, int n) {
@@ -105,8 +99,8 @@ static void print_segment(int i, const char *lang) {
     int n = snprintf(line, sizeof line, "[%s.%03d] [%s] %.*s\n",
                      wall, ms, lang, (int)len, text);
     if (n < 0) return;
-    if ((size_t)n >= sizeof line) n = (int)sizeof(line) - 1; /* clamp: snprintf's
-        return value is what *would* have been written, not what fit in `line` */
+    if ((size_t)n >= sizeof line) n = (int)sizeof(line) - 1; /* snprintf returns the
+        *would-be* length, not what fit — clamp before writing */
         fwrite(line, 1, n, stdout);
     fflush(stdout);
     if (g_notes) { fwrite(line, 1, n, g_notes); fflush(g_notes); }
@@ -205,7 +199,7 @@ int main(int argc, char *argv[]) {
     }
     g_chunk_samples = SAMPLE_RATE * g_chunk_sec;
 
-    /* resolve the default model path relative to the binary's own directory */
+    /* resolve the default model path next to the binary */
     static char resolved_model[4096 + 64];
     if (!g_model_given && bin_dir_join(resolved_model, sizeof resolved_model, DEF_MODEL_PATH))
         g_model_path = resolved_model;
@@ -214,9 +208,6 @@ int main(int argc, char *argv[]) {
     signal(SIGTERM, on_signal);
 
     whisper_log_set(cb_log_disable, NULL);
-
-    /* backends (CPU/Vulkan/CUDA/HIP) are linked in statically now, so they
-     *      self-register at startup — no ggml_backend_load_all_from_path() needed */
 
     struct whisper_context_params cparams = whisper_context_default_params();
     g_ctx = whisper_init_from_file_with_params(g_model_path, cparams);

@@ -45,7 +45,10 @@ looks by default, so no flag is needed afterwards:
 # ./download-model.sh large-v3  # best (quality/speed recommended for GPU use)
 ```
 
-**4. Find your monitor source** — 
+**4. Find your monitor source** — the one thing that differs per machine.
+Every output device has a `...monitor` source that receives everything played
+through it; pick the monitor of the device your audio actually goes through
+(speakers/headphones, not an unused HDMI):
 
 ```sh
 pactl list sources short | grep monitor
@@ -82,7 +85,7 @@ Tuning:
 
 ### GPU (optional)
 
-CPU works out of the box but quality is not the best, for best quality/speed rebuild with a GPU backend
+CPU works out of the box. For faster inference rebuild with a GPU backend
 (driver packages for your card required):
 
 ```sh
@@ -101,7 +104,8 @@ make GPU=HIP      # AMD (ROCm)
 - **No text although audio plays** — you're monitoring a source that
   receives no audio. Pick the monitor of the *output device* you actually
   use (step 4).
-- **Slow on CPU** — use a smaller model or build with GPU for instance `make GPU=Vulkan`.
+- **Slow on CPU** — use a smaller model or build with a GPU backend
+  (`make GPU=Vulkan`).
 
 ## How it works
 
@@ -113,4 +117,5 @@ stdout.
 
 ## License
 
-MIT (see [LICENSE](LICENSE); whisper.cpp is MIT too). YOU CAN COPY DISTRIBUTE AND DO WHATEVER YOU WANT WITH THIS CODE BUT MONETIZING IT
+MIT (see [LICENSE](LICENSE); whisper.cpp is MIT too). Copy, distribute,
+and do whatever you want — monetizing it requires attribution.

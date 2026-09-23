@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# ----------------------------------------------------------------------------
-# download-model.sh — fetch a whisper.cpp GGML model into whisper.cpp/models/
+# Fetch a whisper.cpp GGML model into whisper.cpp/models/.
 #
 #   ./download-model.sh            # default: ggml-small.bin
 #   ./download-model.sh small      # ggml-small.bin
@@ -12,8 +11,7 @@
 # ----------------------------------------------------------------------------
 set -euo pipefail
 
-# Map a friendly name to the exact GGML filename on Hugging Face.
-#   https://huggingface.co/ggerganov/whisper.cpp/resolve/main/<file>
+# https://huggingface.co/ggerganov/whisper.cpp/resolve/main/<file>
 declare -A NAMES=(
   [tiny]="ggml-tiny.bin"
   [base]="ggml-base.bin"
@@ -22,9 +20,6 @@ declare -A NAMES=(
   [large-v3]="ggml-large-v3.bin"
   [large-v3-turbo]="ggml-large-v3-turbo.bin"
 )
-
-# NOTE: the app's built-in default is ggml-small.bin — download that unless
-# you pass -m explicitly.
 
 NAME="${1:-small}"
 FILE="${NAMES[$NAME]:-}"
