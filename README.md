@@ -6,8 +6,8 @@ gates out silence, and transcribes it with
 automatic language detection, timestamped output.
 
 ```
-[21:14:03.012] [en] and so the whole pipeline is working now
-[21:14:06.530] [en] I will close the issue tomorrow
+[21:14:03] [en] and so the whole pipeline is working now
+[21:14:06] [en] I will close the issue tomorrow
 ```
 
 ## Requirements
@@ -112,8 +112,8 @@ make GPU=HIP      # AMD (ROCm)
 The main thread records 16 kHz mono PCM in chunks from the monitor source.
 A worker thread skips chunks below the RMS gate and runs the rest through
 whisper.cpp with automatic language detection, printing each segment with
-its wall-clock time, offset within the chunk, and detected language to
-stdout.
+its wall-clock time and detected language to stdout. Timestamps reflect
+when a segment was transcribed, not when the audio was originally spoken.
 
 ## License
 
